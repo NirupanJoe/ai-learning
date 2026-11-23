@@ -2,45 +2,25 @@ import "dotenv/config";
 import { initChatModel, tool } from "langchain";
 import config from "./config/index.js";
 import * as z from "zod";
-import { ToolMessage, HumanMessage } from "@langchain/core/messages";
 
 console.log("Model:", config.llmModel);
 console.log("ModelProvider:", config.llmModelProvider);
 
-const getWeather = tool(
-  (input) => `It's always sunny in ${input.city}!`,
-  {
-    name: "get_weather",
-    description: "Get the weather for a given city",
-    schema: z.object({
-      city: z.string().describe("The city to get the weather for"),
-    }),
-  }
-);
+const Movies = z.object({
+    title: z.string().describe('The title of the movie'),
+    year: z.number().describe('The year the movie was released'),
+    director: z.string().describe('The director of the movie'),
+    rating: z.number().describe('The movies rating out of 10')
+})
+
 
 const model = await initChatModel(config.llmModel, {
     modelProvider: config.llmModelProvider,
     apiKey: config.llmApiKey,
-});
-const llm = model.bindTools([getWeather]);
+})
 
-const response = await llm.invoke("What's the weather in Coimbator?");
+const modelWithStructure = model.withStructuredOutput(Movies, { includeRaw: true })
 
-if (response.tool_calls?.length) {
-    const toolCall = response.tool_calls[0];
+const response = await modelWithStructure.invoke('Provide details about the movie Inception')
 
-    const toolResult = await getWeather.invoke(toolCall.args);
-
-    const finalResponse = await model.invoke([
-        new HumanMessage("What's the weather in Coimbator?"),
-        response,
-        new ToolMessage({
-            content: toolResult,
-            tool_call_id: toolCall.id,
-        }),
-    ]);
-
-    console.log(finalResponse.content);
-} else {
-    console.log(response.content);
-}
+console.log(response)
